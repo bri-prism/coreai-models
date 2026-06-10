@@ -87,11 +87,26 @@ def unpack_codes_uint32(packed: torch.Tensor, bits: int, cols: int) -> torch.Ten
         raise ValueError(f"bits must be one of {SUPPORTED_BITS}, got {bits}")
     per_word = 32 // bits
     rows = packed.shape[0]
-    # Reinterpret the signed int32 payload as unsigned 32-bit values.
-    words = (packed.to(torch.int64) & 0xFFFFFFFF).unsqueeze(-1)
-    shifts = torch.arange(per_word, dtype=torch.int64, device=packed.device) * bits
-    mask = (1 << bits) - 1
-    codes = (words >> shifts) & mask
+    # Arithmetic-only unpacking (floor-div + remainder instead of shift/mask):
+    # this runs inside `LowBitLinear.forward`, so it must trace to ATen ops the
+    # Core AI converter can lower (`aten.__rshift__` / `aten.bitwise_and` are
+    # unsupported). For non-negative words the results are identical.
+    del per_word  # the arithmetic path below works on 16-bit half-words
+    # Split each signed int32 word into two 16-bit halves (low first, matching
+    # the little-endian packing). Floor-division/floor-mod arithmetic gives the
+    # same codes as unsigned shift/mask for two's-complement words because
+    # every divisor*modulus is a power of two dividing 2**16.
+    words = packed.to(torch.int64)
+    high = torch.div(words, 1 << 16, rounding_mode="floor")
+    low = words - high * (1 << 16)
+    halves = torch.stack([low, high], dim=-1).reshape(rows, -1).unsqueeze(-1)
+    per_half = 16 // bits
+    divisors = torch.tensor(
+        [1 << (i * bits) for i in range(per_half)], dtype=torch.int64, device=packed.device
+    )
+    shifted = torch.div(halves, divisors, rounding_mode="floor")
+    n_codes = 1 << bits
+    codes = shifted - torch.div(shifted, n_codes, rounding_mode="floor") * n_codes
     return codes.reshape(rows, -1)[:, :cols].to(torch.uint8)
 
 

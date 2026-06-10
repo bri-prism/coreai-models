@@ -167,3 +167,17 @@ What the recurrence needs from the runtime, per linear-attention layer:
 - [ ] `.aimodel` compile + runtime parity (macOS 27 required).
 - [ ] Logit-KLD accuracy gate for 1-bit / 2-bit exports on real checkpoints.
 - [ ] Swift runtime state plumbing + `llm-runner` smoke test.
+
+## Measured macOS 26.5 capability matrix (Xcode 27 beta toolchain installed)
+
+| Step | macOS 26.5 |
+|---|---|
+| `torch.export` + Core AI conversion + `optimize()` | works |
+| `AIProgram.save_asset` → `.aimodel` (mlirb + metadata) | **works** (verified on the small hybrid config) |
+| `aimodelc compile` | refused — "Core AI requires the Metal Toolchain" even with the Metal toolchain installed and registered (`xcodebuild -showComponent` = installed); the check appears to target the running OS's Core AI/Metal stack |
+| Runtime execution | unavailable (Core AI framework not present in the 26.5 SDK/OS) |
+
+Practical consequence: distributable `.aimodel` assets can be produced and archived on
+macOS 26.5 today; compiling and running them requires a macOS 27 host — or potentially an
+iOS 27 device if Core AI follows the Core ML precedent of on-device compilation at install
+time (untested).

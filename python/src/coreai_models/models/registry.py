@@ -40,6 +40,7 @@ def _get_registry() -> dict[str, ModelEntry]:
     from coreai_models.models.macos.qwen2 import Qwen2ForCausalLM
     from coreai_models.models.macos.qwen3 import Qwen3ForCausalLM
     from coreai_models.models.macos.qwen3_moe import Qwen3MoeForCausalLM
+    from coreai_models.models.macos.qwen3_next import Qwen3NextForCausalLM
 
     return {
         "gemma3_text": ModelEntry(
@@ -67,6 +68,9 @@ def _get_registry() -> dict[str, ModelEntry]:
         ),
         "qwen3_moe": ModelEntry(
             macos_class=Qwen3MoeForCausalLM,
+        ),
+        "qwen3_next": ModelEntry(
+            macos_class=Qwen3NextForCausalLM,
         ),
     }
 

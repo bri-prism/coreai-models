@@ -9,6 +9,11 @@
 KEY_CACHE_NAME = "keyCache"
 VALUE_CACHE_NAME = "valueCache"
 
+# SSM/linear-attention state names used by hybrid-attention models
+# (e.g. qwen3_next): a rolling conv window plus the recurrent state.
+CONV_STATE_NAME = "convState"
+SSM_STATE_NAME = "ssmState"
+
 # Trace-time KV cache sequence length. Used only for export/quantization tracing
 # to bound peak memory; at inference the actual cache size is determined
 # dynamically.

@@ -18,9 +18,11 @@ import torch
 from coreai.authoring import AIProgram
 
 from coreai_models.export._constants import (
+    CONV_STATE_NAME,
     KEY_CACHE_NAME,
     QUANT_TRACE_OFFSET,
     QUANT_TRACE_QUERY_LEN,
+    SSM_STATE_NAME,
     TRACE_KV_CACHE_SEQ_LEN,
     VALUE_CACHE_NAME,
 )
@@ -71,8 +73,15 @@ def _build_reference_inputs(
 ) -> tuple[dict[str, torch.Tensor], dict]:
     """Build reference inputs and dynamic shapes for macOS model export.
 
+    All LLMs get ``input_ids``/``position_ids`` inputs plus the ``k_cache``/
+    ``v_cache`` state tensors. Hybrid-attention models that expose a
+    ``create_state_tensors`` classmethod (e.g. ``qwen3_next``) additionally get
+    ``conv_state``/``ssm_state`` tensors for their linear-attention layers;
+    both are fixed-shape (the conv window and recurrent state do not grow with
+    sequence length), so their dynamic-shape entries are ``None``.
+
     Args:
-        model: The PyTorch model (used only to read config).
+        model: The PyTorch model (used to read config and detect SSM state).
         config: HuggingFace model config.
         target_dtype: Data type for cache tensors.
         max_context_length: Maximum context length for the model.
@@ -120,6 +129,16 @@ def _build_reference_inputs(
             )
         },
     }
+
+    # Hybrid-attention models carry extra SSM state alongside the KV cache.
+    create_state_tensors = getattr(type(model), "create_state_tensors", None)
+    if create_state_tensors is not None:
+        conv_state, ssm_state = create_state_tensors(config, dtype=target_dtype)
+        reference_inputs["conv_state"] = conv_state
+        reference_inputs["ssm_state"] = ssm_state
+        # Fixed shapes: neither state tensor grows with sequence length.
+        dynamic_shapes["conv_state"] = None
+        dynamic_shapes["ssm_state"] = None
 
     return reference_inputs, dynamic_shapes
 
@@ -233,7 +252,11 @@ def export_macos_model(
 
     input_names = ("input_ids", "position_ids")
     output_names = ("logits",)
+    # One runtime name per mutated state input, in forward-signature order
+    # (k_cache, v_cache[, conv_state, ssm_state]).
     state_names = (KEY_CACHE_NAME, VALUE_CACHE_NAME)
+    if "conv_state" in reference_inputs:
+        state_names = (*state_names, CONV_STATE_NAME, SSM_STATE_NAME)
 
     logger.info("Exporting model to Core AI dialect...")
     coreai_program = export_to_coreai(

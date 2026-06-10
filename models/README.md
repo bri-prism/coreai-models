@@ -46,6 +46,8 @@ uv run coreai.llm.export org/NewModel \
 | Platform | Preset                                     | Description                                    |
 |----------|--------------------------------------------|------------------------------------------------|
 | macOS    | `4bit` (default)                           | INT4 weight-only, block size 32 (all layers)   |
+| macOS    | `1bit_affine_group64` / `1bit_affine_group128` | 1-bit group-wise affine weights (uint32-packed codes + fp16 scales/biases) |
+| macOS    | `2bit_affine_group64` / `2bit_affine_group128` | 2-bit group-wise affine weights (uint32-packed codes + fp16 scales/biases) |
 | macOS    | `none`                                     | Full precision                                 |
 | iOS      | `4bit_weight_palettized_group32` (default) | 4-bit palettization with channel group size 32 |
 | iOS      | `4bit_weight_palettized_group8`            | 4-bit palettization with channel group size 8  |
@@ -114,6 +116,7 @@ uv run models/<name>/export.py
 - [Qwen2.5](qwen2)
 - [Qwen3](qwen3)
 - [Qwen3 MoE](qwen3_moe)
+- [Qwen3-Next](qwen3_next) (dense-MLP configs)
 
 ### Diffusion Models
 

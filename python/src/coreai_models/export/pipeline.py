@@ -193,6 +193,7 @@ async def _async_export_model(config: ExportConfig) -> str:
             )
         model = model.eval()
         # ---- 3. Resolve compression preset ----
+        lowbit_config = None
         if config.compression_config_object is not None:
             if isinstance(config.compression_config_object, KMeansPalettizerConfig):
                 torch_palettization_config = config.compression_config_object
@@ -204,12 +205,22 @@ async def _async_export_model(config: ExportConfig) -> str:
             preset = get_preset(config.compression)
             torch_quantization_config = preset.get("torch_quantization_config")
             torch_palettization_config = preset.get("torch_palettization_config")
+            lowbit_config = preset.get("lowbit_config")
 
         assert not (
             torch_quantization_config is not None and torch_palettization_config is not None
         ), "Both a quantization and a palettization config were provided, this should never happen."
 
-        # ---- 3a. Pre-export torch quantization (if configured) ----
+        # ---- 3a. Pre-export low-bit affine quantization (if configured) ----
+        if lowbit_config is not None:
+            from coreai_models.primitives.lowbit import apply_lowbit_quantization
+
+            logger.info(
+                f"Applying pre-export low-bit affine quantization (preset={config.compression})"
+            )
+            model = apply_lowbit_quantization(model, **lowbit_config)
+
+        # ---- 3b. Pre-export torch quantization (if configured) ----
         effective_max_ctx = max_context_length or getattr(
             hf_config, "max_position_embeddings", TRACE_KV_CACHE_SEQ_LEN
         )

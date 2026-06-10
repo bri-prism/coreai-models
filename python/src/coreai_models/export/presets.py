@@ -108,6 +108,32 @@ MACOS_PRESETS: dict[str, dict[str, Any]] = {
         "suffix": "4bit",
         "description": "INT4 symmetric per-block weight quantization (torch pre-export)",
     },
+    # ---------------------------------------------------------------
+    # Low-bit (1-bit / 2-bit) group-wise affine weight quantization.
+    # Applied as a module swap (nn.Linear -> LowBitLinear) before export.
+    # Packed uint32 codes + fp16 scales/biases, MLX-compatible layout.
+    # See coreai_models.primitives.lowbit.
+    # ---------------------------------------------------------------
+    "1bit_affine_group64": {
+        "lowbit_config": {"bits": 1, "group_size": 64, "symmetric": True},
+        "suffix": "1bit_g64",
+        "description": "1-bit symmetric group-wise affine weights (group size 64)",
+    },
+    "2bit_affine_group64": {
+        "lowbit_config": {"bits": 2, "group_size": 64, "symmetric": True},
+        "suffix": "2bit_g64",
+        "description": "2-bit symmetric group-wise affine weights (group size 64)",
+    },
+    "1bit_affine_group128": {
+        "lowbit_config": {"bits": 1, "group_size": 128, "symmetric": True},
+        "suffix": "1bit_g128",
+        "description": "1-bit symmetric group-wise affine weights (group size 128)",
+    },
+    "2bit_affine_group128": {
+        "lowbit_config": {"bits": 2, "group_size": 128, "symmetric": True},
+        "suffix": "2bit_g128",
+        "description": "2-bit symmetric group-wise affine weights (group size 128)",
+    },
 }
 
 IOS_PRESETS: dict[str, dict[str, Any]] = {

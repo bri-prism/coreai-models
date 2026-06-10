@@ -41,14 +41,25 @@ are gated DeltaNet linear attention.
 - Parity tests vs HF eager (synthetic weights): prefill, single token,
   homogeneous stacks of either layer type, float16, and stateful
   prefill+decode parity against `Qwen3NextDynamicCache`.
+- `export_macos_model` registers the two extra state tensors as named runtime
+  state (`convState` / `ssmState`) next to the KV cache, gated on the model
+  class exposing `create_state_tensors`; plain LLMs keep KV-only state.
+- `torch.export` of the full hybrid stack validated with dynamic shapes, at
+  both a small synthetic config and the full-size dense geometry (fake-tensor
+  weights): one `while_loop` per linear-attention layer, all four state
+  mutations present, and exported-program numerics bit-exact vs eager on a
+  prefill+decode sequence. Core AI conversion + `optimize()` also validated
+  (full-precision and 1-bit preset), with the `gated_delta_update` composite
+  externalized per linear layer.
+- Fixed `SSMState.update_states` to emit full-rank `begin`/`end` index
+  vectors: the torch custom op tolerated a one-short `end` (trailing dim
+  became a full slice) but the MLIR `coreai.slice_update` verifier rejects
+  rank-mismatched operands.
 
 ### Remaining
 
-- Wire the two extra state tensors through `export_macos_model` (today it
-  hardcodes `state_names = (k_cache, v_cache)`; the model forward already
-  takes `conv_state` / `ssm_state`).
-- Validate `torch.export` of the full hybrid stack and `.aimodel` compilation
-  (requires macOS 27 toolchain; see §3).
+- `.aimodel` compilation and runtime parity (requires macOS 27 toolchain; see
+  §3).
 - Registry presets for public Qwen3-Next checkpoints (the public checkpoints
   are MoE, so this is gated on MoE support — `SwitchLinear`/GatherMM reuse
   from the qwen3_moe recipe is the obvious path).
@@ -81,6 +92,11 @@ Format (`coreai_models/primitives/lowbit/`):
 - macOS compression presets `1bit_affine_group{64,128}`,
   `2bit_affine_group{64,128}` wired into the export pipeline (applied as a
   pre-export module swap, mutually exclusive with coreai-opt presets).
+- Export-compatible dequantization: the unpack path uses floor-div/remainder
+  arithmetic on 16-bit half-words instead of shift/mask, because the Core AI
+  converter rejects `aten.__rshift__` / `aten.bitwise_and` (and constants must
+  fit int32). A 1-bit hybrid stack converts end-to-end through
+  `export_macos_model`.
 
 ### Remaining
 
@@ -144,7 +160,10 @@ What the recurrence needs from the runtime, per linear-attention layer:
 - [x] HF parity (eager, synthetic weights): prefill / decode / fp16.
 - [x] Low-bit primitive unit tests.
 - [x] Low-bit model smoke test (1-bit and 2-bit hybrid stack runs, finite).
-- [ ] `torch.export` of the hybrid stack with dynamic shapes.
+- [x] `torch.export` of the hybrid stack with dynamic shapes (small config
+      numerics-exact vs eager; full-size geometry via fake-tensor weights).
+- [x] Core AI conversion + optimize with all four named states
+      (full-precision and 1-bit preset).
 - [ ] `.aimodel` compile + runtime parity (macOS 27 required).
 - [ ] Logit-KLD accuracy gate for 1-bit / 2-bit exports on real checkpoints.
 - [ ] Swift runtime state plumbing + `llm-runner` smoke test.

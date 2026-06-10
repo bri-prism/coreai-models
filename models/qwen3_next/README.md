@@ -37,11 +37,12 @@ Available presets: `1bit_affine_group64`, `2bit_affine_group64`,
 [`docs/qwen3-next-lowbit-plan.md`](../../docs/qwen3-next-lowbit-plan.md) for
 format details and current export status.
 
-> **Note**: end-to-end `.aimodel` export for this architecture is still in
-> progress — the gated DeltaNet layers require extra named state tensors
-> (rolling conv window + recurrent state) beyond the standard KV cache. The
-> PyTorch authoring, HF parity tests, and quantization primitives are complete;
-> see the plan doc for the remaining runtime wiring.
+> **Note**: the Python export path is validated through `torch.export` and
+> Core AI conversion: the gated DeltaNet state tensors (rolling conv window +
+> recurrent state) register as named runtime state (`convState` / `ssmState`)
+> alongside the KV cache, for both full-precision and low-bit presets. The
+> remaining steps — `.aimodel` compilation and Swift runtime state plumbing —
+> require the macOS 27 toolchain; see the plan doc.
 
 ## Architecture notes
 

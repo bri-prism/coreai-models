@@ -255,12 +255,14 @@ class SSMState:
                     *[torch.tensor((0,), dtype=torch.int32) for _ in range(cache.dim() - 1)],
                 ]
             ),
+            # `end` must cover every dim: the MLIR slice_update op requires
+            # begin/end of the same rank as the cache tensor.
             end=torch.cat(
                 [
                     layer_index_end,
                     *[
                         torch.tensor((cache.size(i),), dtype=torch.int32)
-                        for i in range(1, 1 + cache.dim() - 2)
+                        for i in range(1, cache.dim())
                     ],
                 ]
             ),
